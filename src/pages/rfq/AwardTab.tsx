@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CheckCircle2 } from 'lucide-react'
 import type { Rfq } from '../../data/types'
 import { useStore } from '../../store/StoreContext'
 import { findL1, getVendor, latestQuote, enrichQuote } from '../../store/selectors'
@@ -45,23 +46,59 @@ export function AwardTab({ rfq, readOnly }: AwardTabProps) {
 
   if (rfq.award) {
     const vendor = getVendor(state.vendors, rfq.award.awardedVendorId)
+    const sourceReq = state.requests.find((r) => r.id === rfq.fromRequestId)
     return (
-      <div className="space-y-6">
-        <Card>
-          <h3 className="text-sm font-semibold text-[var(--green)] mb-2">Award confirmed</h3>
+      <div className="space-y-6 max-w-2xl">
+        <Card className="border-[var(--green)]/40">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 size={18} className="text-[var(--green)]" />
+            <h3 className="text-sm font-semibold text-[var(--green)]">Award confirmed</h3>
+          </div>
           <p className="text-lg font-medium">{vendor?.name}</p>
-          <p className="tnum text-[var(--accent)] font-semibold mt-1">{rfq.award.finalPrice}</p>
-          <p className="text-sm text-[var(--ink-soft)] mt-4">{rfq.award.justification}</p>
+          <p className="font-mono text-xs text-[var(--ink-soft)]">{vendor?.code}</p>
+          <p className="tnum text-[var(--accent)] font-semibold mt-2 text-xl">{rfq.award.finalPrice}</p>
+          <p className="text-sm text-[var(--ink-soft)] mt-4 leading-relaxed">{rfq.award.justification}</p>
         </Card>
+
         <Card>
-          <h3 className="text-sm font-semibold mb-3">Audit trail</h3>
-          <ul className="text-sm space-y-2 text-[var(--ink-soft)]">
-            <li>Awarded by {rfq.award.awardedBy}</li>
-            <li>At {formatDateTime(rfq.award.awardedAt)}</li>
-            <li>Was L1: {rfq.award.wasL1 ? 'Yes' : 'No — justification on file'}</li>
-            <li>Negotiation rounds: {new Set(rfq.negotiations.map((n) => n.round)).size}</li>
+          <h3 className="text-sm font-semibold mb-4">Audit trail</h3>
+          <ul className="text-sm space-y-3">
+            {[
+              { label: 'RFQ created', detail: formatDateTime(rfq.createdAt) },
+              {
+                label: 'Vendors invited',
+                detail: `${rfq.vendors.length} from mapped pool`,
+              },
+              {
+                label: 'Responses received',
+                detail: `${rfq.vendors.filter((v) => v.responseStatus !== 'no_response').length} vendors`,
+              },
+              {
+                label: 'Negotiation',
+                detail: `${new Set(rfq.negotiations.map((n) => n.round)).size} round(s)`,
+              },
+              {
+                label: 'Awarded',
+                detail: `${rfq.award.wasL1 ? 'L1 vendor' : 'Above L1 — justification on file'} · by ${rfq.award.awardedBy} · ${formatDateTime(rfq.award.awardedAt)}`,
+              },
+            ].map((row) => (
+              <li key={row.label} className="flex gap-3">
+                <span className="h-2 w-2 rounded-full bg-[var(--green)] mt-1.5 shrink-0" />
+                <span>
+                  <span className="font-medium">{row.label}</span>
+                  <span className="text-[var(--ink-soft)]"> — {row.detail}</span>
+                </span>
+              </li>
+            ))}
           </ul>
         </Card>
+
+        {sourceReq && (
+          <div className="rounded-lg bg-[var(--green-soft)] px-4 py-3 text-sm text-[var(--green)]">
+            Request {sourceReq.id} raised by {sourceReq.createdBy} is now fulfilled.
+          </div>
+        )}
+
         <p className="text-sm text-[var(--ink-faint)]">
           Award completed · Sent to procurement execution →
         </p>
