@@ -36,6 +36,17 @@ export interface Vendor {
 export interface ExtractedField {
   value: string
   confidence: Confidence
+  /** The phrase in the raw email this value was extracted from (provenance). */
+  sourceText?: string
+  /** True once a human has overridden the AI-extracted value. */
+  edited?: boolean
+}
+
+export type DeviationSeverity = 'major' | 'minor'
+
+export interface Deviation {
+  text: string
+  severity: DeviationSeverity
 }
 
 export interface QuoteVersion {
