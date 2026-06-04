@@ -146,6 +146,7 @@ function reducer(state: AppState, action: Action): AppState {
                   ...field,
                   value: action.value,
                   confidence: action.value ? 'high' : field.confidence,
+                  edited: true,
                 },
               }
               return enrichQuote(updated, rfq.category)
