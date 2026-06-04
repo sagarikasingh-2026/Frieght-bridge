@@ -1,3 +1,4 @@
+import { StoreProvider } from './store/StoreContext'
 import { ToastProvider } from './components/ui/Toast'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
@@ -107,8 +108,10 @@ function DesignSystemPreview() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <DesignSystemPreview />
-    </ToastProvider>
+    <StoreProvider>
+      <ToastProvider>
+        <DesignSystemPreview />
+      </ToastProvider>
+    </StoreProvider>
   )
 }
