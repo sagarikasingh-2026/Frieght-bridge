@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { FileSpreadsheet, FileText } from 'lucide-react'
 import type { ExtractedField, QuoteVersion, Rfq } from '../../data/types'
 import { useStore } from '../../store/StoreContext'
-import { getVendor } from '../../store/selectors'
+import { extractionFieldSummary, getVendor } from '../../store/selectors'
 import { getSeededExtraction, simulateExtraction } from '../../lib/extraction'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -17,13 +17,13 @@ interface InboxTabProps {
   focusEmailId: string | null
 }
 
-const EXTRACT_FIELDS: (keyof QuoteVersion)[] = [
-  'basePrice',
-  'taxes',
-  'freight',
-  'leadTime',
-  'paymentTerms',
-  'validity',
+const FIELD_LABELS: { key: keyof QuoteVersion; label: string }[] = [
+  { key: 'basePrice', label: 'Base / Rate' },
+  { key: 'taxes', label: 'Taxes' },
+  { key: 'freight', label: 'Freight' },
+  { key: 'leadTime', label: 'Lead time' },
+  { key: 'paymentTerms', label: 'Payment terms' },
+  { key: 'validity', label: 'Validity' },
 ]
 
 export function InboxTab({ rfq, readOnly, focusEmailId }: InboxTabProps) {
@@ -62,7 +62,7 @@ export function InboxTab({ rfq, readOnly, focusEmailId }: InboxTabProps) {
     if (f && typeof f === 'object' && 'value' in f) {
       setDraft({
         ...draft,
-        [field]: { ...f, value, confidence: value ? 'high' : f.confidence },
+        [field]: { ...f, value, confidence: value ? 'high' : f.confidence, edited: true },
       })
     }
   }
@@ -71,6 +71,19 @@ export function InboxTab({ rfq, readOnly, focusEmailId }: InboxTabProps) {
     if (!draft || !email) return
     dispatch({ type: 'APPLY_EXTRACTION', rfqId: rfq.id, emailId: email.id, quote: draft })
     showToast('Quote applied to comparison matrix')
+  }
+
+  if (rfq.emails.length === 0) {
+    return (
+      <Card>
+        <h3 className="text-sm font-semibold mb-2">No vendor emails yet</h3>
+        <p className="text-sm text-[var(--ink-soft)]">
+          This RFQ has been sent and is awaiting responses. Vendor replies are captured here
+          automatically; the simulated extraction bot then structures each quote into the
+          comparison matrix.
+        </p>
+      </Card>
+    )
   }
 
   return (
@@ -152,20 +165,32 @@ export function InboxTab({ rfq, readOnly, focusEmailId }: InboxTabProps) {
             )}
             {draft && (
               <div className="space-y-3 relative">
-                <span
-                  className={[
-                    'text-[11px] uppercase tracking-[0.04em] px-2 py-0.5 rounded-full',
-                    draft.extractionStatus === 'success'
-                      ? 'bg-[var(--green-soft)] text-[var(--green)]'
-                      : draft.extractionStatus === 'partial'
-                        ? 'bg-[var(--amber-soft)] text-[var(--amber)]'
-                        : 'bg-[var(--red-soft)] text-[var(--red)]',
-                  ].join(' ')}
-                >
-                  {draft.extractionStatus.replace('_', ' ')}
-                </span>
-                {EXTRACT_FIELDS.map((key, i) => {
-                  const field = draft[key as keyof QuoteVersion] as ExtractedField
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={[
+                      'text-[11px] uppercase tracking-[0.04em] px-2 py-0.5 rounded-full',
+                      draft.extractionStatus === 'success'
+                        ? 'bg-[var(--green-soft)] text-[var(--green)]'
+                        : draft.extractionStatus === 'partial'
+                          ? 'bg-[var(--amber-soft)] text-[var(--amber)]'
+                          : 'bg-[var(--red-soft)] text-[var(--red)]',
+                    ].join(' ')}
+                  >
+                    {draft.extractionStatus.replace('_', ' ')}
+                  </span>
+                </div>
+                {(() => {
+                  const s = extractionFieldSummary(draft)
+                  return (
+                    <p className="text-[11px] text-[var(--ink-soft)]">
+                      {s.high} of {s.high + s.review + s.missing} fields high-confidence
+                      {s.review > 0 && ` · ${s.review} needs review`}
+                      {s.missing > 0 && ` · ${s.missing} missing`}
+                    </p>
+                  )
+                })()}
+                {FIELD_LABELS.map(({ key, label }, i) => {
+                  const field = draft[key] as ExtractedField
                   if (!field || typeof field !== 'object' || !('value' in field)) return null
                   return (
                     <motion.div
@@ -174,16 +199,28 @@ export function InboxTab({ rfq, readOnly, focusEmailId }: InboxTabProps) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.08 }}
                     >
-                      <label className="text-[11px] uppercase text-[var(--ink-faint)]">{key}</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] uppercase text-[var(--ink-faint)]">{label}</label>
+                        {field.edited && (
+                          <span className="text-[9px] uppercase tracking-[0.04em] text-[var(--ink-faint)] border border-[var(--border)] rounded px-1">
+                            edited
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <ConfidenceDot confidence={field.confidence} />
                         <input
-                          className="flex-1 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
+                          className="flex-1 border border-[var(--border)] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                           value={field.value}
                           disabled={readOnly}
                           onChange={(e) => updateDraftField(key, e.target.value)}
                         />
                       </div>
+                      {field.sourceText && (
+                        <p className="text-[10px] text-[var(--ink-faint)] mt-1 italic">
+                          from: “{field.sourceText}”
+                        </p>
+                      )}
                     </motion.div>
                   )
                 })}

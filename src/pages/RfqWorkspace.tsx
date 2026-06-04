@@ -1,18 +1,17 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Eye } from 'lucide-react'
 import { useStore } from '../store/StoreContext'
 import { getRfq } from '../store/selectors'
 import { Tabs } from '../components/ui/Tabs'
-import { StatusPill } from '../components/ui/StatusPill'
-import { rfqStatusToPill } from '../lib/rfqStatus'
+import { RfqHeader, type WorkspaceTab } from '../components/rfq/RfqHeader'
+import type { Rfq } from '../data/types'
 import { OverviewTab } from './rfq/OverviewTab'
 import { VendorsTab } from './rfq/VendorsTab'
 import { ComparisonTab } from './rfq/ComparisonTab'
 import { NegotiationTab } from './rfq/NegotiationTab'
 import { InboxTab } from './rfq/InboxTab'
 import { AwardTab } from './rfq/AwardTab'
-
-type WorkspaceTab = 'overview' | 'vendors' | 'comparison' | 'negotiation' | 'inbox' | 'award'
 
 interface WorkspaceCtx {
   tab: WorkspaceTab
@@ -38,13 +37,31 @@ const TAB_ITEMS = [
   { id: 'award', label: 'Award' },
 ]
 
+function defaultTab(rfq: Rfq): WorkspaceTab {
+  switch (rfq.status) {
+    case 'draft':
+      return 'vendors'
+    case 'sent':
+    case 'awaiting_responses':
+      return 'overview'
+    case 'partially_responded':
+    case 'under_negotiation':
+      return 'comparison'
+    case 'awarded':
+      return 'award'
+    default:
+      return 'overview'
+  }
+}
+
 export function RfqWorkspace() {
   const { id } = useParams<{ id: string }>()
   const { state } = useStore()
-  const [tab, setTab] = useState<WorkspaceTab>('comparison')
+  const rfq = id ? getRfq(state, id) : undefined
+  const initialTab = useMemo(() => (rfq ? defaultTab(rfq) : 'overview'), [rfq?.id])
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab)
   const [focusEmailId, setFocusEmailId] = useState<string | null>(null)
 
-  const rfq = id ? getRfq(state, id) : undefined
   const readOnly = state.role !== 'sourcing_manager' || rfq?.status === 'awarded'
 
   if (!rfq) {
@@ -65,7 +82,15 @@ export function RfqWorkspace() {
   const tabContent: Record<WorkspaceTab, ReactNode> = {
     overview: <OverviewTab rfq={rfq} readOnly={readOnly} />,
     vendors: <VendorsTab rfq={rfq} readOnly={readOnly} onGoTab={setTab} />,
-    comparison: <ComparisonTab rfq={rfq} readOnly={readOnly} onAward={() => setTab('award')} onNegotiate={() => setTab('negotiation')} onOpenInbox={openInbox} />,
+    comparison: (
+      <ComparisonTab
+        rfq={rfq}
+        readOnly={readOnly}
+        onAward={() => setTab('award')}
+        onNegotiate={() => setTab('negotiation')}
+        onOpenInbox={openInbox}
+      />
+    ),
     negotiation: <NegotiationTab rfq={rfq} readOnly={readOnly} />,
     inbox: <InboxTab rfq={rfq} readOnly={readOnly} focusEmailId={focusEmailId} />,
     award: <AwardTab rfq={rfq} readOnly={readOnly} />,
@@ -79,16 +104,22 @@ export function RfqWorkspace() {
         </Link>
         <span className="text-[var(--ink-faint)]">/</span>
         <span className="font-mono text-[var(--ink-soft)]">{rfq.id}</span>
-        <StatusPill status={rfqStatusToPill(rfq.status)} />
-        {readOnly && state.role === 'procurement' && (
-          <span className="text-xs text-[var(--ink-faint)]">(read-only)</span>
-        )}
       </div>
-      <Tabs
-        tabs={TAB_ITEMS}
-        activeId={tab}
-        onChange={(id) => setTab(id as WorkspaceTab)}
-      >
+
+      {state.role === 'procurement' && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm">
+          <Eye size={16} className="text-[var(--ink-faint)] mt-0.5 shrink-0" />
+          <p className="text-[var(--ink-soft)]">
+            You're viewing as <strong>Procurement</strong> — this is read-only. The{' '}
+            <strong>Sourcing Manager</strong> owns RFQ actions (vendors, negotiation, award).
+            Switch role in the top bar to act.
+          </p>
+        </div>
+      )}
+
+      <RfqHeader rfq={rfq} readOnly={readOnly} onGoTab={setTab} />
+
+      <Tabs tabs={TAB_ITEMS} activeId={tab} onChange={(id) => setTab(id as WorkspaceTab)}>
         {tabContent[tab]}
       </Tabs>
     </WorkspaceContext.Provider>

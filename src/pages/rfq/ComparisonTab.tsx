@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
+import { AlertTriangle, Clock, ShieldCheck, TrendingDown } from 'lucide-react'
 import type { ExtractedField, Rfq } from '../../data/types'
 import { useStore } from '../../store/StoreContext'
 import {
+  annualMultiplier,
   enrichQuote,
   findL1,
   getVendor,
   latestQuote,
+  parseMoney,
   quoteAtVersion,
+  quoteDeviations,
 } from '../../store/selectors'
-import { inr, formatDate } from '../../lib/format'
+import { inr } from '../../lib/format'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { ConfidenceDot } from '../../components/ui/ConfidenceDot'
 import { Pill } from '../../components/ui/Pill'
 import { Button } from '../../components/ui/Button'
-import { rfqStatusToPill } from '../../lib/rfqStatus'
 
 interface ComparisonTabProps {
   rfq: Rfq
@@ -55,12 +57,46 @@ function CellValue({
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5" title={field.sourceText}>
       <ConfidenceDot confidence={field.confidence} />
       <span>{field.value}</span>
+      {field.edited && (
+        <span
+          className="text-[9px] uppercase tracking-[0.04em] text-[var(--ink-faint)] border border-[var(--border)] rounded px-1"
+          title="Manually edited by Sourcing Manager"
+        >
+          edited
+        </span>
+      )}
     </span>
   )
 }
+
+function InsightCard({
+  icon,
+  label,
+  value,
+  tone = 'ink',
+}: {
+  icon: ReactNodeIcon
+  label: string
+  value: string
+  tone?: 'ink' | 'accent' | 'green'
+}) {
+  const color =
+    tone === 'accent' ? 'text-[var(--accent)]' : tone === 'green' ? 'text-[var(--green)]' : 'text-[var(--ink)]'
+  return (
+    <div className="flex-1 min-w-[150px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.04em] text-[var(--ink-faint)]">
+        {icon}
+        {label}
+      </div>
+      <div className={`text-sm font-semibold mt-1 ${color}`}>{value}</div>
+    </div>
+  )
+}
+
+type ReactNodeIcon = React.ReactNode
 
 export function ComparisonTab({
   rfq,
@@ -71,6 +107,7 @@ export function ComparisonTab({
 }: ComparisonTabProps) {
   const { state, dispatch } = useStore()
   const [showNegotiated, setShowNegotiated] = useState(true)
+  const [annualized, setAnnualized] = useState(false)
   const [editing, setEditing] = useState<{
     vendorId: string
     versionNo: number
@@ -78,6 +115,7 @@ export function ComparisonTab({
   } | null>(null)
 
   const l1 = findL1(rfq, showNegotiated)
+  const mult = annualized ? annualMultiplier(rfq.fields.frequency) : 1
 
   const responsePill = (status: string) => {
     if (status === 'no_response') return 'no_response' as const
@@ -86,26 +124,47 @@ export function ComparisonTab({
     return 'responded' as const
   }
 
+  // Insights: fastest lead time + fewest deviations among responders with a real quote.
+  const responders = rfq.vendors
+    .map((vor) => {
+      const q = showNegotiated ? latestQuote(vor) : quoteAtVersion(vor, 1) ?? latestQuote(vor)
+      return q && q.extractionStatus !== 'manual_review' ? { vor, q: enrichQuote(q, rfq.category) } : null
+    })
+    .filter((x): x is { vor: (typeof rfq.vendors)[number]; q: ReturnType<typeof enrichQuote> } => !!x)
+
+  const fastest = responders
+    .filter((r) => parseMoney(r.q.leadTime.value) > 0)
+    .sort((a, b) => parseMoney(a.q.leadTime.value) - parseMoney(b.q.leadTime.value))[0]
+  const cleanest = [...responders].sort((a, b) => a.q.deviations.length - b.q.deviations.length)[0]
+
   return (
     <div className="pb-28">
-      <div className="sticky top-0 z-10 -mx-6 px-6 py-3 bg-[var(--bg)]/95 border-b border-[var(--border)] mb-6 backdrop-blur-sm">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-mono font-medium">{rfq.id}</span>
-          <span className="text-[var(--ink-faint)]">·</span>
-          <span className="font-medium flex items-center gap-1">
-            {rfq.fields.origin}
-            <ArrowRight size={14} className="text-[var(--accent)]" />
-            {rfq.fields.destination}
-          </span>
-          <span className="text-[var(--ink-faint)] hidden sm:inline">·</span>
-          <span className="text-xs text-[var(--ink-soft)] hidden sm:inline">
-            {rfq.fields.vehicleType?.split(' ').slice(-2).join(' ') ?? rfq.fields.vehicleType}
-          </span>
-          <span className="text-xs text-[var(--ink-soft)]">{rfq.fields.frequency}</span>
-          <span className="text-xs text-[var(--ink-soft)]">Due {formatDate(rfq.deadline)}</span>
-          <StatusPill status={rfqStatusToPill(rfq.status)} />
-        </div>
-        <label className="mt-3 flex items-center gap-2 text-sm text-[var(--ink-soft)] cursor-pointer">
+      <div className="flex flex-wrap gap-3 mb-5">
+        <InsightCard
+          icon={<ShieldCheck size={13} />}
+          label="Lowest landed (L1)"
+          tone="accent"
+          value={l1 ? `${getVendor(state.vendors, l1.vendorId)?.name} · ${inr(l1.landedCost * mult)}` : '—'}
+        />
+        <InsightCard
+          icon={<Clock size={13} />}
+          label="Fastest lead time"
+          value={fastest ? `${getVendor(state.vendors, fastest.vor.vendorId)?.name} · ${fastest.q.leadTime.value}` : '—'}
+        />
+        <InsightCard
+          icon={<TrendingDown size={13} />}
+          label="Fewest deviations"
+          tone="green"
+          value={
+            cleanest
+              ? `${getVendor(state.vendors, cleanest.vor.vendorId)?.name} · ${cleanest.q.deviations.length} dev.`
+              : '—'
+          }
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
+        <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)] cursor-pointer">
           <input
             type="checkbox"
             checked={showNegotiated}
@@ -114,6 +173,17 @@ export function ComparisonTab({
           />
           Show negotiated prices
         </label>
+        {rfq.fields.frequency && rfq.fields.frequency !== 'One-time movement' && (
+          <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={annualized}
+              onChange={(e) => setAnnualized(e.target.checked)}
+              className="accent-[var(--accent)]"
+            />
+            Annualized ({rfq.fields.frequency} × {annualMultiplier(rfq.fields.frequency)})
+          </label>
+        )}
       </div>
 
       <div className="overflow-x-auto border border-[var(--border)] rounded-xl bg-[var(--surface)]">
@@ -124,7 +194,7 @@ export function ComparisonTab({
               <th className="p-4 font-medium">Base / Rate</th>
               <th className="p-4 font-medium">Taxes</th>
               <th className="p-4 font-medium">Freight</th>
-              <th className="p-4 font-medium">Landed cost</th>
+              <th className="p-4 font-medium">{annualized ? 'Annual landed' : 'Landed cost'}</th>
               <th className="p-4 font-medium">Lead time</th>
               <th className="p-4 font-medium">Payment</th>
               <th className="p-4 font-medium">Validity</th>
@@ -135,13 +205,12 @@ export function ComparisonTab({
             {rfq.vendors.map((vor, rowIdx) => {
               const vendor = getVendor(state.vendors, vor.vendorId)
               const v1 = quoteAtVersion(vor, 1)
-              const quoteRaw = showNegotiated
-                ? latestQuote(vor)
-                : v1 ?? latestQuote(vor)
+              const quoteRaw = showNegotiated ? latestQuote(vor) : v1 ?? latestQuote(vor)
               const quote = quoteRaw ? enrichQuote(quoteRaw, rfq.category) : undefined
               const isL1 = l1 && vor.vendorId === l1.vendorId && quote && (quote.landedCost ?? 0) > 0
               const failed = quote?.extractionStatus === 'manual_review'
               const v1Cost = v1 ? enrichQuote(v1, rfq.category).landedCost : undefined
+              const devs = quote ? quoteDeviations(quote) : []
 
               const renderEditableCell = (fieldKey: EditableField) => {
                 if (!quote) return null
@@ -170,6 +239,7 @@ export function ComparisonTab({
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                          if (e.key === 'Escape') setEditing(null)
                         }}
                       />
                     ) : (
@@ -186,8 +256,10 @@ export function ComparisonTab({
                           })
                         }
                         className={[
-                          'text-left w-full',
-                          !readOnly && !failed ? 'hover:bg-[var(--bg)] rounded px-1 -mx-1' : '',
+                          'text-left w-full rounded',
+                          !readOnly && !failed
+                            ? 'hover:bg-[var(--bg)] px-1 -mx-1 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]'
+                            : '',
                         ].join(' ')}
                       >
                         <CellValue
@@ -215,21 +287,19 @@ export function ComparisonTab({
                   <td className="p-4 align-top">
                     <div className="font-medium text-[var(--ink)]">{vendor?.name}</div>
                     <div className="font-mono text-xs text-[var(--ink-soft)] mt-0.5">{vendor?.code}</div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                       <StatusPill status={responsePill(vor.responseStatus)} />
+                      {isL1 && <Pill tone="accent">L1</Pill>}
                     </div>
-                    {isL1 && (
-                      <Pill tone="accent" className="mt-2">
-                        L1
-                      </Pill>
-                    )}
                   </td>
                   {vor.responseStatus === 'no_response' ? (
                     <td colSpan={8} className="p-4 text-[var(--ink-faint)]">
                       No response yet
                     </td>
                   ) : !quote ? (
-                    <td colSpan={8} className="p-4 text-[var(--ink-faint)]">—</td>
+                    <td colSpan={8} className="p-4 text-[var(--ink-faint)]">
+                      —
+                    </td>
                   ) : (
                     <>
                       {(['basePrice', 'taxes', 'freight'] as EditableField[]).map((fieldKey) =>
@@ -238,13 +308,13 @@ export function ComparisonTab({
                       <td className="p-4 align-top font-semibold tnum">
                         {(quote.landedCost ?? 0) > 0 ? (
                           <div>
-                            {inr(quote.landedCost ?? 0)}
+                            {inr((quote.landedCost ?? 0) * mult)}
                             {showNegotiated &&
                               quote.versionNo > 1 &&
                               v1Cost != null &&
                               v1Cost !== quote.landedCost && (
-                                <div className="text-[10px] font-normal text-[var(--ink-soft)] mt-1">
-                                  v{quote.versionNo} ↓ from {inr(v1Cost)}
+                                <div className="text-[10px] font-normal text-[var(--green)] mt-1">
+                                  v{quote.versionNo} ↓ from {inr(v1Cost * mult)}
                                 </div>
                               )}
                           </div>
@@ -260,11 +330,12 @@ export function ComparisonTab({
                         renderEditableCell(fieldKey),
                       )}
                       <td className="p-4 align-top">
-                        {quote.deviations.length ? (
+                        {devs.length ? (
                           <div className="flex flex-col gap-1">
-                            {quote.deviations.map((d, i) => (
-                              <Pill key={i} tone="amber">
-                                {d}
+                            {devs.map((d, i) => (
+                              <Pill key={i} tone={d.severity === 'major' ? 'red' : 'amber'}>
+                                {d.severity === 'major' && <AlertTriangle size={10} />}
+                                {d.text}
                               </Pill>
                             ))}
                           </div>
@@ -288,8 +359,9 @@ export function ComparisonTab({
               <span className="text-[var(--ink-soft)]">Current L1: </span>
               <span className="font-medium">{getVendor(state.vendors, l1.vendorId)?.name}</span>
               <span className="tnum font-semibold text-[var(--accent)] ml-2">
-                {inr(l1.landedCost)}
+                {inr(l1.landedCost * mult)}
               </span>
+              {annualized && <span className="text-xs text-[var(--ink-faint)] ml-1">/ year</span>}
             </>
           ) : (
             <span className="text-[var(--ink-soft)]">L1 not determined yet</span>
