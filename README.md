@@ -25,4 +25,3 @@ Your live URL will be like `https://godrej-freight-bridge.vercel.app`.
 1. **Procurement** → Requests → New request (Malanpur origin shows resolved address) → Submit  
 2. **Sourcing Manager** → Review → Approve → Create RFQ → Select vendors → Send  
 3. Open **RFQ-2026-0042** → Inbox / Comparison / Negotiation / Award  
-4. **Reset demo** in the top bar restores seed data  

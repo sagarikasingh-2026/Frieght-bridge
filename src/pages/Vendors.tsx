@@ -15,8 +15,11 @@ export function Vendors() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[var(--ink-faint)]">
-        Vendor master is managed externally — read-only mapped pool for this prototype.
+      <p className="text-sm text-[var(--ink-soft)] max-w-2xl">
+        This is the <strong>company vendor directory</strong> (read-only). You do not send RFQs from
+        here. Actions — select vendors, send RFQ, reminders — live on each RFQ’s{' '}
+        <strong>Vendors</strong> tab after a Sourcing Manager creates the RFQ from an approved
+        request.
       </p>
       {Object.entries(grouped).map(([key, list]) => {
         const [cat, sub] = key.split('::')

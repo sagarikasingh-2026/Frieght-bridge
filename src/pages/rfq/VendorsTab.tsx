@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { useToast } from '../../components/ui/Toast'
+import { useWorkspace } from '../RfqWorkspace'
 
 interface VendorsTabProps {
   rfq: Rfq
@@ -15,9 +16,10 @@ interface VendorsTabProps {
 export function VendorsTab({ rfq, readOnly, onGoTab }: VendorsTabProps) {
   const { state, dispatch } = useStore()
   const { showToast } = useToast()
+  const workspace = useWorkspace()
   const isDraft = rfq.status === 'draft'
   const [selected, setSelected] = useState<string[]>(
-    rfq.vendors.map((v) => v.vendorId),
+    rfq.vendors.length ? rfq.vendors.map((v) => v.vendorId) : [],
   )
 
   const pool = state.vendors.filter(
@@ -44,9 +46,10 @@ export function VendorsTab({ rfq, readOnly, onGoTab }: VendorsTabProps) {
   if (isDraft && !readOnly) {
     return (
       <Card>
-        <h3 className="text-sm font-semibold mb-2">Select vendors from mapped pool</h3>
+        <h3 className="text-sm font-semibold mb-2">Select vendors & send RFQ</h3>
         <p className="text-xs text-[var(--ink-soft)] mb-4">
-          Filtered by category, lane, and sub-category. No discovery or ad-hoc adds.
+          This is where the Sourcing Manager invites vendors from the pre-mapped pool (not the
+          read-only master list under sidebar → Vendors).
         </p>
         <ul className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-xl overflow-hidden mb-4">
           {pool.map((v) => (
@@ -76,7 +79,11 @@ export function VendorsTab({ rfq, readOnly, onGoTab }: VendorsTabProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <p className="text-sm text-[var(--ink-soft)]">
+        Per-vendor response status for this RFQ. Reminders and inbox live here once the RFQ is
+        sent.
+      </p>
       {rfq.vendors.map((vor) => {
         const v = state.vendors.find((x) => x.id === vor.vendorId)
         const pill =
@@ -88,12 +95,33 @@ export function VendorsTab({ rfq, readOnly, onGoTab }: VendorsTabProps) {
                 ? 'incomplete'
                 : 'responded'
         return (
-          <Card key={vor.vendorId} className="flex items-center justify-between gap-4">
+          <Card key={vor.vendorId} className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="font-medium">{v?.name}</div>
               <div className="font-mono text-xs text-[var(--ink-soft)]">{v?.code}</div>
+              <div className="text-xs text-[var(--ink-faint)] mt-1">{v?.email}</div>
             </div>
-            <StatusPill status={pill} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <StatusPill status={pill} />
+              {!readOnly && vor.responseStatus === 'no_response' && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={vor.reminded}
+                  onClick={() => {
+                    dispatch({ type: 'REMIND_VENDOR', rfqId: rfq.id, vendorId: vor.vendorId })
+                    showToast(`Reminder sent to ${v?.email}`)
+                  }}
+                >
+                  {vor.reminded ? 'Reminded' : 'Send reminder'}
+                </Button>
+              )}
+              {vor.quotes.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => workspace.setTab('inbox')}>
+                  View in Inbox
+                </Button>
+              )}
+            </div>
           </Card>
         )
       })}

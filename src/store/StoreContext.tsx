@@ -1,6 +1,5 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -22,7 +21,6 @@ import type {
 import { enrichQuote } from './selectors'
 
 type Action =
-  | { type: 'RESET' }
   | { type: 'HYDRATE'; state: AppState }
   | { type: 'SET_ROLE'; role: Role }
   | { type: 'SET_CATEGORY_CONTEXT'; category: AppState['categoryContext'] }
@@ -47,6 +45,11 @@ type Action =
   | { type: 'ADD_VENDOR_QUOTE'; rfqId: string; vendorId: string; quote: QuoteVersion }
   | { type: 'SET_AWARD'; rfqId: string; award: Award }
 
+/** Fresh copy so reset never returns a mutated singleton. */
+export function cloneSeedState(): AppState {
+  return JSON.parse(JSON.stringify(initialState)) as AppState
+}
+
 function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -54,7 +57,7 @@ function loadState(): AppState {
   } catch {
     /* ignore */
   }
-  return initialState
+  return cloneSeedState()
 }
 
 function updateRfq(state: AppState, rfqId: string, updater: (rfq: Rfq) => Rfq): AppState {
@@ -66,8 +69,6 @@ function updateRfq(state: AppState, rfqId: string, updater: (rfq: Rfq) => Rfq): 
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'RESET':
-      return initialState
     case 'HYDRATE':
       return action.state
     case 'SET_ROLE':
@@ -211,7 +212,6 @@ function reducer(state: AppState, action: Action): AppState {
 interface StoreContextValue {
   state: AppState
   dispatch: React.Dispatch<Action>
-  resetDemo: () => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -223,12 +223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
 
-  const resetDemo = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    dispatch({ type: 'RESET' })
-  }, [])
-
-  const value = useMemo(() => ({ state, dispatch, resetDemo }), [state, resetDemo])
+  const value = useMemo(() => ({ state, dispatch }), [state])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

@@ -48,6 +48,13 @@ export function OverviewTab({ rfq, readOnly }: OverviewTabProps) {
   ]
 
   return (
+    <div className="space-y-4">
+      <p className="text-sm text-[var(--ink-soft)] max-w-2xl">
+        <strong>How responses are tracked:</strong> vendors reply by email → messages appear in{' '}
+        <strong>Inbox</strong> → simulated AI extracts quote fields → structured rows show on{' '}
+        <strong>Comparison</strong>. Status pills here reflect who has quoted, is late, or has not
+        replied.
+      </p>
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
         <Card>
@@ -122,6 +129,7 @@ export function OverviewTab({ rfq, readOnly }: OverviewTabProps) {
           />
         </Card>
       </div>
+    </div>
     </div>
   )
 }

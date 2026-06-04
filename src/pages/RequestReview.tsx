@@ -106,7 +106,14 @@ export function RequestReview() {
         </div>
       )}
       {isSm && req.status === 'approved' && !state.rfqs.some((r) => r.fromRequestId === req.id) && (
-        <Button onClick={() => setShowRfqModal(true)}>Create RFQ</Button>
+        <div>
+          <p className="text-sm text-[var(--ink-soft)] mb-3 max-w-xl">
+            <strong>Procurement</strong> raised this request. As <strong>Sourcing Manager</strong>,
+            you turn it into an RFQ, pick vendors, and send it — procurement does not send RFQs in
+            this workflow.
+          </p>
+          <Button onClick={() => setShowRfqModal(true)}>Create RFQ</Button>
+        </div>
       )}
       {state.rfqs.some((r) => r.fromRequestId === req.id) && (
         <Link to={`/rfqs/${state.rfqs.find((r) => r.fromRequestId === req.id)?.id}`} className="text-[var(--accent)] text-sm">
