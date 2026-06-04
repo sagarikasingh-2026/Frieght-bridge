@@ -31,7 +31,6 @@ function CellValue({
   field,
   extractionFailed,
   onOpenInbox,
-  emailId,
 }: {
   field: ExtractedField
   extractionFailed?: boolean
@@ -282,7 +281,7 @@ export function ComparisonTab({
         </table>
       </div>
 
-      <div className="fixed bottom-0 left-60 right-0 z-20 border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+      <div className="fixed bottom-0 left-0 lg:left-60 right-0 z-20 border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
         <div className="text-sm">
           {l1 ? (
             <>
