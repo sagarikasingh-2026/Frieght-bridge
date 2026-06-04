@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --border: #e8e6e1;
+  --ink: #1a1a17;
+  --ink-soft: #6b6862;
+  --ink-faint: #a8a39b;
+  --accent: #1f5c4d;
+  --accent-soft: #e7f0ed;
+  --amber: #b8731f;
+  --amber-soft: #faf0e2;
+  --red: #a23b36;
+  --red-soft: #f8eae9;
+  --green: #2f7d5b;
+  --green-soft: #e8f2ec;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: "Fraunces", serif;
+}
+
+.font-mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.tnum {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
