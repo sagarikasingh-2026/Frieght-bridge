@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { useStore } from '../store/StoreContext'
@@ -58,9 +58,17 @@ export function RfqWorkspace() {
   const { id } = useParams<{ id: string }>()
   const { state } = useStore()
   const rfq = id ? getRfq(state, id) : undefined
-  const initialTab = useMemo(() => (rfq ? defaultTab(rfq) : 'overview'), [rfq?.id])
-  const [tab, setTab] = useState<WorkspaceTab>(initialTab)
+  const [tab, setTab] = useState<WorkspaceTab>(() => (rfq ? defaultTab(rfq) : 'overview'))
   const [focusEmailId, setFocusEmailId] = useState<string | null>(null)
+
+  // Reset to the status-appropriate tab when navigating to a different RFQ.
+  const lastIdRef = useRef(id)
+  useEffect(() => {
+    if (id !== lastIdRef.current) {
+      lastIdRef.current = id
+      if (rfq) setTab(defaultTab(rfq))
+    }
+  }, [id, rfq])
 
   const readOnly = state.role !== 'sourcing_manager' || rfq?.status === 'awarded'
 
