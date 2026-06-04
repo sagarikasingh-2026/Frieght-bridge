@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { StoreProvider } from './store/StoreContext'
 import { ToastProvider } from './components/ui/Toast'
-import { AppShell } from './components/shell/AppShell'
+import { ShellLayout } from './components/shell/ShellLayout'
 import { Dashboard } from './pages/Dashboard'
 import { RfqList } from './pages/RfqList'
 import { RfqWorkspace } from './pages/RfqWorkspace'
@@ -17,7 +17,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Navigate to="/rfqs" replace />} />
-            <Route element={<AppShell title="RFQs" />}>
+            <Route element={<ShellLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/rfqs" element={<RfqList />} />
               <Route path="/rfqs/:id" element={<RfqWorkspace />} />

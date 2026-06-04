@@ -31,6 +31,14 @@ type Action =
   | { type: 'ADD_RFQ'; rfq: Rfq }
   | { type: 'UPDATE_RFQ'; rfq: Rfq }
   | { type: 'UPDATE_QUOTE_FIELD'; rfqId: string; vendorId: string; versionNo: number; field: keyof QuoteVersion; value: unknown }
+  | {
+      type: 'UPDATE_EXTRACTED_FIELD'
+      rfqId: string
+      vendorId: string
+      versionNo: number
+      field: 'basePrice' | 'taxes' | 'freight' | 'leadTime' | 'paymentTerms' | 'validity'
+      value: string
+    }
   | { type: 'SET_RFQ_STATUS'; rfqId: string; status: RfqStatus }
   | { type: 'DISPATCH_RFQ'; rfqId: string; vendorIds: string[] }
   | { type: 'REMIND_VENDOR'; rfqId: string; vendorId: string }
@@ -114,6 +122,31 @@ function reducer(state: AppState, action: Action): AppState {
             quotes: v.quotes.map((q) => {
               if (q.versionNo !== action.versionNo) return q
               const updated = { ...q, [action.field]: action.value } as QuoteVersion
+              return enrichQuote(updated, rfq.category)
+            }),
+          }
+        }),
+      }))
+    }
+    case 'UPDATE_EXTRACTED_FIELD': {
+      return updateRfq(state, action.rfqId, (rfq) => ({
+        ...rfq,
+        vendors: rfq.vendors.map((v) => {
+          if (v.vendorId !== action.vendorId) return v
+          return {
+            ...v,
+            quotes: v.quotes.map((q) => {
+              if (q.versionNo !== action.versionNo) return q
+              const field = q[action.field]
+              if (typeof field !== 'object' || !('value' in field)) return q
+              const updated = {
+                ...q,
+                [action.field]: {
+                  ...field,
+                  value: action.value,
+                  confidence: action.value ? 'high' : field.confidence,
+                },
+              }
               return enrichQuote(updated, rfq.category)
             }),
           }
